@@ -1,0 +1,449 @@
+#!/bin/bash
+
+# Name: Sean Solberg 
+# email: solbergs@oregonstate.edu
+# CS344 Assignment 1
+# Date: 1/27/2018
+
+function dims (){
+	line=$(head -n 1 $1)
+	j=0
+	for i in $line
+	do	
+		j=$(expr $j + 1)
+	done
+	
+	rows=$(wc -l <$1)
+	echo "${rows} $j"
+}
+
+function transpose (){
+	trap "rm -f temp$$; echo 'CTRL-C received, exiting'; exit 1" INT HUP TERM
+
+	#Check to see if only 1 matrix passed
+	if [ "$#" -eq 1 ] 
+	then
+		numRows=$(wc -l < $1)
+
+		#Get number of columns
+        	line=$(head -n 1 $1)
+		numCols=0
+		for i in $line
+		do	
+			numCols=$(expr $numCols + 1)
+		done
+
+		#Iterate through each column and transpose
+		for((i=1; i<=$numCols; i++))
+		do
+			cut -f"$i" $1 | tr '\n' '\t'i >> temp$$
+			echo "" >> temp$$
+		done
+			while read lines
+			do	
+				countT=1
+				for i in $lines
+				do
+				if [ $countT -ne $numRows ]
+				then
+					countT=`expr $countT + 1 `
+					echo -n $i
+					echo -ne '\t'
+				else
+					echo $i
+					countT=1
+				fi
+				done
+			done < temp$$
+			 
+		rm -f temp$$
+	
+	else
+		echo "Error, exit 1" >&2
+		exit 1
+	fi
+}
+
+function mean (){	
+	trap "rm -f tempMyLine$$ tempAverages1$$; echo 'CTRL-C received, exiting'; exit 1" INT HUP TERM
+
+	#Get number of columns
+	line=$(head -n 1 $1)
+	numCols=0
+	for i in $line
+	do	
+		numCols=$(expr $numCols + 1)
+	done
+	
+	#Take each column and store in temp file as row
+	for((i=1; i<=$numCols; i++))
+	do
+		cut -f"$i" $1 | tr '\n' '\t'i >> myline$$
+		echo "" >>myline$$	
+	done	
+	
+	#Iterate through row to calculate average (per bigloops ex. program)
+	ctrs=0
+	while read line	
+	do
+		sum=0
+		average=0
+		count=0	
+		ctrs=`expr $ctrs + 1`
+		for i in $line
+		do
+			count=`expr $count + 1`
+			sum=`expr $sum + $i`
+	 	done
+		if [ $sum -gt 0 ]
+		then
+			a=1
+		else
+			a=0
+		fi
+		num1=`expr $count / 2`
+		num2=`expr $a \* 2`
+		num3=`expr $num2 - 1`
+		num4=`expr $num1  \*  $num3 `
+		num5=` expr $sum + $num4`
+		average=`expr $num5 / $count`
+	
+ 		if [ $ctrs -lt $numCols ]
+		then
+			echo -ne $average >>averages1$$
+			echo -ne '\t' >>averages1$$
+		else
+			echo $average >>averages1$$
+			ctrs=0
+		fi
+	done < myline$$
+		
+	#Print results
+	while read avLine
+	do	
+		ctr=0
+		#echo "here"
+		for i in $avLine  
+	 	do	
+			ctr=`expr $ctr + 1`
+			if [ $ctr -ne $numCols ]
+	 		then
+				echo -ne "$i\t"
+			elif [ $ctr -eq $numCols ]
+			then
+				echo -e "$i"
+			fi
+		done  
+	done < averages1$$
+	
+	#Remove temp files
+	rm -f averages1$$
+	rm -f myline$$
+
+}
+
+function add (){	
+	trap "rm -f temp1$$ temp2$$ temp3$$ temp4$$; echo 'CTRL-C received, exiting'; exit 1" INT HUP TERM
+
+	#Get number of rows of 1
+	numRows=$(wc -l < $1)	
+
+	#Get number of rows of 2
+	numRows2=$(wc -l < $2)	
+
+	#Get number of columns of 1
+        line=$(head -n 1 $1)
+	numCols=0
+	for i in $line
+	do	
+		numCols=$(expr $numCols + 1)
+	done
+
+	#Get number of columns of 2
+        line2=$(head -n 1 $2)
+	numCols2=0
+	for i in $line2
+	do	
+		numCols2=$(expr $numCols2 + 1)
+	done
+
+	if [ $numRows -eq $numRows2 ] && [ $numCols -eq $numCols2 ] 
+	then
+	#Deconstruct original matrix into a single column
+	for((i=1; i<=$numRows; i++))
+	do
+		aline1=$(head -n $i $1 | tail -1)
+		aline2=$(head -n $i $2 | tail -1)
+		
+		for k in $aline1
+		do		
+			echo $k >> temp1$$
+			
+		done
+		for k in $aline2
+		do
+			echo $k >> temp2$$
+		done
+	done
+
+	#Paste columns togeter and then iterate over each line to sum elements in each row
+	paste temp1$$ temp2$$ > temp3$$
+	
+	sum=0
+	while read aline
+	do
+		sum=0
+		for i in $aline
+		do	
+			sum=`expr $sum + $i`
+		done
+		echo $sum >> temp4$$
+	done < temp3$$	
+
+	
+	#Reconstruct original matrix
+	counter=0
+	while read myLine
+	do 
+		counter=`expr $counter + 1`
+		if [ $counter -ne $numCols ]
+		then
+			echo -ne "$myLine\t"
+		elif [ $counter -eq $numCols ]
+		then
+			echo -ne "$myLine\n"
+			counter=0
+		fi
+	done < temp4$$
+	
+	#Remove temp files
+	rm temp1$$
+	rm temp2$$
+	rm temp3$$
+	rm temp4$$
+
+	else
+		echo "Error, exit 1" >&2
+		exit 1
+	fi
+}
+
+function multiply (){
+	trap "rm -f temp1$$ temp2$$ temp3$$ temp4$$ temp5$$; echo 'CTRL-C received, exiting'; exit 1" INT HUP TERM
+
+
+	#Must have common num colums in 1st matrix to num rows in second
+	#Num rows in matrix 2
+	commonN=$(wc -l < $2)	
+
+	#Num columns in matrix 1
+        line=$(head -n 1 $1)
+	colsOne=0
+	for i in $line
+	do	
+		colsOne=$(expr $colsOne + 1)
+	done
+	
+	#Check matrix dimensions
+	if [ $commonN -eq $colsOne ]
+	then
+	
+	#Find num rows of 1st matrix
+	numRows=$(wc -l < $1 )	
+
+	#Find num colums of 2nd matrix
+        line=$(head -n 1 $2)
+	numCols=0
+	for i in $line
+	do	
+		numCols=$(expr $numCols + 1)
+	done
+
+	#Deconstruct 1st matrix into columns
+	for((i=1; i<=$numRows; i++))
+	do
+		aline1=$(head -n $i $1 | tail -1)
+		
+		for((j=1;j<=$numCols; j++))
+		do
+			for k in $aline1
+			do		
+				echo $k >> temp1$$
+			
+			done
+		done
+	done
+	
+	#Deconstruct 2nd matrix into columns
+	for((i=1; i<=$numRows; i++))
+	do	
+		for((j=1; j<=$numCols; j++))
+		do
+			aline=$(cut -f$j $2)
+			for k in $aline
+			do
+				echo $k >>temp2$$
+			done
+		done	
+	done	
+	
+	#Put columns together
+	paste temp1$$ temp2$$ > temp3$$
+	
+	#Multiply each value
+	while read aline
+	do	
+		pdt=1
+		for i in $aline
+		do	
+			pdt=`expr $pdt \* $i`
+		done
+		echo $pdt >> temp4$$
+	done < temp3$$	
+
+	#Sum values to get final matrix value
+	tempCount=0
+	sumVal=0
+	while read temp4Line
+	do
+		for i in $temp4Line
+		do
+			sumVal=`expr $sumVal + $i` 
+			tempCount=`expr $tempCount + 1`
+			if [ $tempCount -eq $commonN ]
+			then
+				echo $sumVal >> temp5$$
+				tempCount=0
+				sumVal=0
+			fi
+		done
+	done < temp4$$
+
+	#Reconstruct M*P matrix
+	counter=0
+	while read myLine
+	do 
+		counter=`expr $counter + 1`
+		echo -ne "$myLine"
+		if [ $counter -ne $numCols ]
+		then
+			echo -ne '\t'
+		fi
+		if [ $counter -eq $numCols ]
+		then
+			echo ""
+			counter=0
+		fi
+	done < temp5$$
+		
+
+	rm temp1$$
+	rm temp2$$
+	rm temp3$$
+	rm temp4$$
+	rm temp5$$
+
+	else
+		echo "Error, exit 1" >&2
+		exit 1
+	fi
+}
+
+trap "rm -f tempDimFile$$; echo 'CTRL-C received, exiting'; exit 1" INT HUP TERM
+
+#If statments to identify function
+if [ $1 = "dims" ]
+then
+	if   [ "$#" -eq 2 ] && [ -e "$2" ] && [ -r "$2" ]
+	then	
+		$1 "${@:2}"	
+	elif [ "$#" -eq 1 ] && [ ! -t 0 ]
+	then
+		while read line
+		do
+			echo -e "$line" >> tempDimFile$$
+		done < /dev/stdin 
+		dims tempDimFile$$
+	elif [ "$#" -ge 3 ]
+	then
+		echo "Error, exit 1" >&2
+		exit 1
+	else 
+		echo "Error, exit 1" >&2
+		exit 1
+	fi
+	rm -f tempDimFile$$
+elif [ $1 = "transpose" ]
+then
+	if [ -r "$2" ] && [ -e "$2" ] &&  [ "$#" -eq 2 ] 
+	then	
+		$1 "${@:2}"	
+	elif [ "$#" -eq 1 ]
+	then
+		while read -r line
+		do
+			echo -e "$line" >> tempfile$$
+		done < /dev/stdin 
+		transpose tempfile$$
+		rm -f tempfile$$
+	elif [ "$#" -ge 3 ]
+	then
+		echo "Error, exit 1" >&2
+		exit 1
+	else
+		echo "Error, exit 1" >&2
+		exit 1
+	fi
+elif [ $1 = "add" ]
+then
+	if  [ "$#" -eq 3 ] && [ -r "$2" ] && [ -e "$2" ] &&   [ -r "$3" ] && [ -e "$3" ]	
+	then
+		$1 "${@:2}"	
+	elif [ "$#" -gt 3 ]
+	then
+		echo "Error, exit 1" >&2
+		exit 1
+	else
+		echo "Error, exit 1" >&2
+		exit 1
+	fi
+elif [ $1 = "mean" ]
+then
+	if [ "$#" -eq 2 ] && [ -r "$2" ] && [ -e "$2" ]
+	then	
+		$1 "${@:2}"	 
+	elif [ "$#" -eq 1 ] && [ ! -t 0 ]
+	then
+		#echo "in then"
+		while read -r line
+		do
+			echo -e "$line" >> tempMeanFile$$
+		done < /dev/stdin 
+		mean tempMeanFile$$
+		rm -f tempMeanFile$$
+	elif [ "$#" -ge 3 ]
+	then
+		echo "Error, exit 1" >&2
+		exit 1
+	else
+		echo "Error, exit 1" >&2 
+		exit 1
+	fi
+elif [ $1 = "multiply" ]
+then
+	if  [ "$#" -eq 3 ] && [ -r "$2" ] && [ -e "$2" ] &&   [ -r "$3" ] && [ -e "$3" ]	
+	then
+		$1 "${@:2}"	
+	elif [ "$#" -gt 3 ]
+	then
+		echo "Error, exit 1" >&2
+		exit 1
+	else
+		echo "Error, exit 1" >&2
+		exit 1
+	fi
+else 
+	echo "Error, exit 1" >&2
+	exit 1
+fi
+
